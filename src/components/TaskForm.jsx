@@ -4,7 +4,7 @@ function TaskForm({ onSave, editTask }) {
   const [task, setTask] = useState({
     title: '',
     description: '',
-    status: 'Pending',
+    status: '',
     dueDate: ''
   });
 
@@ -19,7 +19,7 @@ function TaskForm({ onSave, editTask }) {
   function handleSubmit(e) {
     e.preventDefault();
     onSave(task);
-    setTask({ title: '', description: '', status: 'Pending', dueDate: '' });
+    setTask({ title: '', description: '', status: '', dueDate: '' });
   }
 
   return (
@@ -29,6 +29,7 @@ function TaskForm({ onSave, editTask }) {
     >
       <h2 className="text-xl font-semibold text-blue-800 mb-2">Add New Task</h2>
 
+      {/* Title Field */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
         <input
@@ -41,6 +42,7 @@ function TaskForm({ onSave, editTask }) {
         />
       </div>
 
+      {/* Description Field */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
         <input
@@ -52,34 +54,42 @@ function TaskForm({ onSave, editTask }) {
         />
       </div>
 
+      {/* Status Dropdown */}
       <div>
         <label className="block mb-2 text-sm font-medium text-gray-700">Status</label>
         <select
           name="status"
           value={task.status}
           onChange={handleChange}
-          className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400 focus:outline-none text-gray-700"
           required
+          className={`w-full p-2 border border-gray-300 rounded ${
+            task.status === '' ? 'text-gray-400' : 'text-black'
+          }`}
         >
-          <option value="">Select Status</option>
+          <option value="" disabled>
+            Select status
+          </option>
           <option value="Pending">Pending</option>
           <option value="In Progress">In Progress</option>
           <option value="Completed">Completed</option>
         </select>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
-        <input
-          name="dueDate"
-          type="date"
-          value={task.dueDate}
-          onChange={handleChange}
-          placeholder="Select a due date"
-          className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400 focus:outline-none text-gray-700 placeholder:text-gray-400"
-        />
-      </div>
+      {/* Due Date Picker */}
+     <div>
+  <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+  <input
+    name="dueDate"
+    type="date"
+    value={task.dueDate}
+    onChange={handleChange}
+    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400 focus:outline-none text-gray-700 placeholder-gray-400"
+    style={{ color: task.dueDate ? '#1f2937' : '#9ca3af' }} // dark text if selected, gray otherwise
+  />
+</div>
 
+
+      {/* Submit Button */}
       <button
         type="submit"
         className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-md transition"
