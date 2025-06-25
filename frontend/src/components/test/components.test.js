@@ -1,5 +1,4 @@
-import '@testing-library/jest-dom'; // <-- this is very important!
-import React from 'react';
+import '@testing-library/jest-dom'; 
 import { render, screen, fireEvent } from '@testing-library/react';
 import TaskForm from '../TaskForm';
 import TaskList from '../TaskList';

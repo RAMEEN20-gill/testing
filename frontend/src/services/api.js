@@ -1,7 +1,7 @@
 const baseUrl = "http://localhost:5000/api/tasks";
 
 // Get all tasks with optional pagination
-// services/api.js
+
 
 export async function getTasks(page = 1, limit = 10, search = '', status = '') {
   try {

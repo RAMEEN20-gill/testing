@@ -24,7 +24,7 @@ router.post('/', validateTask, async (req, res) => {
     }
 });
 
-// ✅ Get all tasks with pagination and filtering
+//  Get all tasks with pagination and filtering
 router.get('/', async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;

@@ -19,7 +19,7 @@ afterAll(async () => {
 
 describe('Task API Routes', () => {
 
-  // ✅ POST - Create Task
+  // POST - Create Task
   it('should create a new task', async () => {
     const response = await request(app).post('/api/tasks').send({
       title: 'Test Task',
@@ -35,7 +35,7 @@ describe('Task API Routes', () => {
     createdTaskId = response.body._id;
   });
 
-  // ✅ GET - All Tasks (with pagination)
+  //  GET - All Tasks (with pagination)
   it('should return tasks with pagination', async () => {
     const res = await request(app).get('/api/tasks?page=1&limit=5');
     expect(res.statusCode).toBe(200);
@@ -43,14 +43,14 @@ describe('Task API Routes', () => {
     expect(Array.isArray(res.body.tasks)).toBe(true);
   });
 
-  // ✅ GET - Single Task by ID
+  //  GET - Single Task by ID
   it('should return a single task by ID', async () => {
     const res = await request(app).get(`/api/tasks/${createdTaskId}`);
     expect(res.statusCode).toBe(200);
     expect(res.body).toHaveProperty('_id', createdTaskId);
   });
 
-  // ✅ PUT - Update Task
+  //  PUT - Update Task
   it('should update the task', async () => {
     const res = await request(app).put(`/api/tasks/${createdTaskId}`).send({
       title: 'Test Task Updated',
@@ -61,7 +61,7 @@ describe('Task API Routes', () => {
     expect(res.body.status).toBe('Completed');
   });
 
-  // ✅ DELETE - Delete Task
+  //  DELETE - Delete Task
   it('should delete the task', async () => {
     const res = await request(app).delete(`/api/tasks/${createdTaskId}`);
     expect(res.statusCode).toBe(200);
