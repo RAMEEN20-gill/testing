@@ -7,9 +7,9 @@
   "license": "ISC",
   "keywords": [],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node app.js",
-    "dev": "nodemon app.js"
+    "dev": "nodemon app.js",
+    "test": "jest"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -19,6 +19,8 @@
     "mongoose": "^8.15.1"
   },
   "devDependencies": {
-    "nodemon": "^3.1.10"
+    "nodemon": "^3.1.10",
+    "jest": "^29.7.0",
+    "supertest": "^6.3.4"
   }
 }

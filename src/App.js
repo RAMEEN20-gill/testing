@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import TaskList from './components/TaskList';
 import TaskForm from './components/TaskForm';
 import TaskDetails from './components/TaskDetails';
@@ -11,15 +11,38 @@ function App() {
   const [viewTask, setViewTask] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalTasks, setTotalTasks] = useState(0);
+  const [completedTasks, setCompletedTasks] = useState(0);
+  const [successMessage, setSuccessMessage] = useState('');
+  const formRef = useRef(null);
+  const limit = 5;
+
+  // Reset page on search/filter change
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, filterStatus]);
 
   useEffect(() => {
-    loadTasks();
-  }, []);
+    const shouldShowView = !!searchTerm || !!filterStatus;
+    loadTasks(shouldShowView);
+  }, [page, searchTerm, filterStatus]);
 
-  async function loadTasks() {
+  async function loadTasks(showSingleTask = false) {
     try {
-      const data = await api.getTasks();
-      setTasks(data);
+      const data = await api.getTasks(page, limit, searchTerm, filterStatus);
+      setTasks(data.tasks);
+      setTotalTasks(data.total);
+      setCompletedTasks(data.completed);
+      setTotalPages(Math.max(Math.ceil(data.total / limit), 1));
+
+      //  Only show task details if filtering/searching & 1 result
+      if (showSingleTask && data.tasks.length === 1) {
+        setViewTask(data.tasks[0]);
+      } else if (showSingleTask) {
+        setViewTask(null);
+      }
     } catch (error) {
       console.error("Failed to load tasks:", error.message);
     }
@@ -29,11 +52,16 @@ function App() {
     try {
       if (task.id || task._id) {
         await api.updateTask(task.id || task._id, task);
+        setSuccessMessage('Task updated successfully!');
       } else {
         await api.createTask(task);
+        setSuccessMessage('Task created successfully!');
       }
-      loadTasks();
+
       setEditTask(null);
+      setViewTask(null);
+      await loadTasks(false); 
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (error) {
       console.error("Error saving task:", error.message);
     }
@@ -42,35 +70,49 @@ function App() {
   async function handleDelete(id) {
     try {
       await api.deleteTask(id);
-      loadTasks();
+      setSuccessMessage('Task deleted successfully!');
+      await loadTasks(false);
+      setViewTask(null);
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (error) {
       console.error("Error deleting task:", error.message);
     }
   }
 
-  const filteredTasks = tasks.filter(task => {
-    const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          task.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = filterStatus === '' || task.status === filterStatus;
-    return matchesSearch && matchesStatus;
-  });
+  const completionRate = totalTasks === 0
+    ? 0
+    : Math.round((completedTasks / totalTasks) * 100);
 
   return (
     <div className="min-h-screen bg-gradient-to-r from-indigo-500 to-purple-600 text-white flex items-center justify-center px-4">
       <div className="w-full max-w-2xl bg-white shadow-lg rounded-lg p-6">
+
         <h1 className="text-2xl md:text-4xl font-bold text-blue-600 underline text-center mb-6">
           Task Manager
         </h1>
 
-        {/* 📝 Task Form */}
-        <TaskForm onSave={handleSave} editTask={editTask} />
+        {/*  Success Message */}
+        {successMessage && (
+          <div className="mb-4 px-4 py-2 bg-green-100 text-green-800 font-medium rounded text-center">
+            {successMessage}
+          </div>
+        )}
 
-        {/* ℹ️ Instruction heading */}
+        {/*  Task Form */}
+        <div ref={formRef}>
+          <TaskForm
+            onSave={handleSave}
+            editTask={editTask}
+            clearEditTask={() => setEditTask(null)}
+          />
+        </div>
+
+        {/*  Instruction */}
         <h3 className="text-md font-medium text-gray-700 mb-2 text-center">
           Select a task to see details
         </h3>
 
-        {/* 🔍 Search & Filter */}
+        {/*  Search & Filter */}
         <div className="flex flex-col md:flex-row gap-4 mb-4 px-4">
           <input
             type="text"
@@ -91,18 +133,53 @@ function App() {
           </select>
         </div>
 
-        {/* 📋 Task List */}
+        {/*  Progress Bar */}
+        {totalTasks > 0 && (
+          <div className="mb-6 px-4">
+            <h3 className="text-lg font-medium text-gray-700 mb-2">Task Completion Progress</h3>
+            <div className="w-full bg-gray-300 rounded-full h-4 overflow-hidden">
+              <div
+                className="bg-green-500 h-full"
+                style={{ width: `${completionRate}%` }}
+              ></div>
+            </div>
+            <p className="text-sm text-gray-600 mt-1">{completionRate}% completed</p>
+          </div>
+        )}
+
+        {/* Task List */}
         <TaskList
-          tasks={filteredTasks}
+          tasks={tasks}
+          onView={(task) => setViewTask(task)}
           onEdit={(task) => {
             setEditTask(task);
             setViewTask(task);
+            setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
           }}
           onDelete={handleDelete}
         />
 
-        {/* 📄 Task Details */}
-        <TaskDetails task={viewTask} />
+        {/* Task Details */}
+        {viewTask && <TaskDetails task={viewTask} />}
+
+        {/*  Pagination */}
+        <div className="flex justify-between items-center mt-6 px-4">
+          <button
+            onClick={() => setPage(prev => Math.max(prev - 1, 1))}
+            disabled={page === 1}
+            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-1 rounded disabled:opacity-50"
+          >
+            Previous
+          </button>
+          <span className="text-gray-700 font-medium">Page {page} of {totalPages}</span>
+          <button
+            onClick={() => setPage(prev => Math.min(prev + 1, totalPages))}
+            disabled={page === totalPages}
+            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-1 rounded disabled:opacity-50"
+          >
+            Next
+          </button>
+        </div>
       </div>
     </div>
   );

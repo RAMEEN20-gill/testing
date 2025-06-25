@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 function TaskForm({ onSave, editTask }) {
   const [task, setTask] = useState({
@@ -8,8 +8,15 @@ function TaskForm({ onSave, editTask }) {
     dueDate: ''
   });
 
+  const titleRef = useRef();
+
   useEffect(() => {
-    if (editTask) setTask(editTask);
+    if (editTask) {
+      setTask(editTask);
+      setTimeout(() => titleRef.current?.focus(), 100);
+    } else {
+      setTask({ title: '', description: '', status: '', dueDate: '' });
+    }
   }, [editTask]);
 
   function handleChange(e) {
@@ -19,7 +26,10 @@ function TaskForm({ onSave, editTask }) {
   function handleSubmit(e) {
     e.preventDefault();
     onSave(task);
-    setTask({ title: '', description: '', status: '', dueDate: '' });
+
+    if (!task.id && !task._id) {
+      setTask({ title: '', description: '', status: '', dueDate: '' });
+    }
   }
 
   return (
@@ -27,13 +37,19 @@ function TaskForm({ onSave, editTask }) {
       onSubmit={handleSubmit}
       className="bg-blue-50 p-6 rounded-lg shadow-md space-y-4 transition-all duration-300 mb-6"
     >
-      <h2 className="text-xl font-semibold text-blue-800 mb-2">Add New Task</h2>
+      <h2 className="text-xl font-semibold text-blue-800 mb-2">
+        {editTask ? 'Edit Task' : 'Add New Task'}
+      </h2>
 
-      {/* Title Field */}
+      {/* Title */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+        <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
+          Title
+        </label>
         <input
+          id="title"
           name="title"
+          ref={titleRef}
           value={task.title}
           onChange={handleChange}
           placeholder="Task title"
@@ -42,10 +58,13 @@ function TaskForm({ onSave, editTask }) {
         />
       </div>
 
-      {/* Description Field */}
+      {/* Description */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+        <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
+          Description
+        </label>
         <input
+          id="description"
           name="description"
           value={task.description}
           onChange={handleChange}
@@ -54,10 +73,13 @@ function TaskForm({ onSave, editTask }) {
         />
       </div>
 
-      {/* Status Dropdown */}
+      {/* Status */}
       <div>
-        <label className="block mb-2 text-sm font-medium text-gray-700">Status</label>
+        <label htmlFor="status" className="block mb-2 text-sm font-medium text-gray-700">
+          Status
+        </label>
         <select
+          id="status"
           name="status"
           value={task.status}
           onChange={handleChange}
@@ -75,26 +97,29 @@ function TaskForm({ onSave, editTask }) {
         </select>
       </div>
 
-      {/* Due Date Picker */}
-     <div>
-  <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
-  <input
-    name="dueDate"
-    type="date"
-    value={task.dueDate}
-    onChange={handleChange}
-    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400 focus:outline-none text-gray-700 placeholder-gray-400"
-    style={{ color: task.dueDate ? '#1f2937' : '#9ca3af' }} // dark text if selected, gray otherwise
-  />
-</div>
+      {/* Due Date */}
+      <div>
+        <label htmlFor="dueDate" className="block text-sm font-medium text-gray-700 mb-1">
+          Due Date
+        </label>
+        <input
+          id="dueDate"
+          name="dueDate"
+          type="date"
+          value={task.dueDate}
+          onChange={handleChange}
+          required
+          className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400 focus:outline-none text-gray-700 placeholder-gray-400"
+          style={{ color: task.dueDate ? '#1f2937' : '#9ca3af' }}
+        />
+      </div>
 
-
-      {/* Submit Button */}
+      {/* Submit */}
       <button
         type="submit"
         className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-md transition"
       >
-        Save Task
+        {editTask ? 'Update Task' : 'Save Task'}
       </button>
     </form>
   );

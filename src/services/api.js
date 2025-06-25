@@ -1,21 +1,34 @@
 const baseUrl = "http://localhost:5000/api/tasks";
 
-// Get all tasks
-export async function getTasks() {
+// Get all tasks with optional pagination
+// services/api.js
+
+export async function getTasks(page = 1, limit = 10, search = '', status = '') {
   try {
-    const res = await fetch(baseUrl);
+    const params = new URLSearchParams({
+      page,
+      limit,
+      search,
+      status
+    });
+
+    const res = await fetch(`${baseUrl}?${params.toString()}`);
     const data = await res.json();
 
-    // Map _id to id for consistent frontend use
-    return data.map(task => ({
-      ...task,
-      id: task._id,
-    }));
+    return {
+      tasks: data.tasks.map(task => ({ ...task, id: task._id })),
+      total: data.total,
+      completed: data.completed,
+      page: data.page,
+      totalPages: data.totalPages
+    };
   } catch (error) {
     console.error("Failed to fetch tasks:", error);
-    return [];
+    return { tasks: [], total: 0, completed: 0, page: 1, totalPages: 1 };
   }
 }
+
+
 
 // Create a new task
 export async function createTask(task) {
@@ -26,7 +39,7 @@ export async function createTask(task) {
       body: JSON.stringify(task),
     });
     const data = await res.json();
-    return { ...data, id: data._id }; // ✅ ensure frontend gets 'id'
+    return { ...data, id: data._id };
   } catch (error) {
     console.error("Failed to create task:", error);
     throw error;
@@ -42,7 +55,7 @@ export async function updateTask(id, task) {
       body: JSON.stringify(task),
     });
     const data = await res.json();
-    return { ...data, id: data._id }; // ✅ ensure frontend gets 'id'
+    return { ...data, id: data._id };
   } catch (error) {
     console.error("Failed to update task:", error);
     throw error;

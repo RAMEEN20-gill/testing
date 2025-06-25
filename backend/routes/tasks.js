@@ -24,15 +24,42 @@ router.post('/', validateTask, async (req, res) => {
     }
 });
 
-// Get all tasks
+// ✅ Get all tasks with pagination and filtering
 router.get('/', async (req, res) => {
-    try {
-        const tasks = await Task.find();
-        res.json(tasks);
-    } catch (err) {
-        res.status(500).json({ message: 'Server Error' });
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const { search = '', status } = req.query;
+
+    const query = {};
+    if (search) {
+      query.$or = [
+        { title: new RegExp(search, 'i') },
+        { description: new RegExp(search, 'i') }
+      ];
     }
+    if (status) {
+      query.status = status;
+    }
+
+    const tasks = await Task.find(query).skip(skip).limit(limit);
+    const total = await Task.countDocuments(query);
+    const completed = await Task.countDocuments({ ...query, status: 'Completed' });
+
+    res.json({
+      tasks,
+      total,
+      completed,
+      page,
+      totalPages: Math.ceil(total / limit)
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Server Error' });
+  }
 });
+
 
 // Get single task
 router.get('/:id', async (req, res) => {
