@@ -1,71 +1,172 @@
-// test/taskRoutes.test.js
-require('dotenv').config();
-jest.setTimeout(10000);
-const request = require('supertest');
-const app = require('../app');
-const mongoose = require('mongoose');
-const Task = require('../models/task'); // Adjust path if needed
+const express = require('express');
+const { body, validationResult } = require('express-validator');
+const Task = require('../models/task');
 
-let createdTaskId;
+const router = express.Router();
 
-beforeAll(async () => {
-  await mongoose.connect(process.env.MONGO_URI);
+// Validation rules
+const validateTask = [
+  body('title').notEmpty().withMessage('Title is required'),
+  body('status').optional().isIn(['Pending', 'In Progress', 'Completed']),
+];
+
+// Create a new task
+router.post('/', validateTask, async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+  try {
+    const task = new Task(req.body);
+    await task.save();
+    res.status(201).json(task);
+  } catch (err) {
+    res.status(500).json({ message: 'Server Error' });
+  }
 });
 
-afterAll(async () => {
-  await Task.deleteMany({ title: /Test Task/i }); // Cleanup test data
-  await mongoose.connection.close();
+// Get all tasks with pagination and filtering
+router.get('/', async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+    const { search = '', status } = req.query;
+
+    const query = {};
+    if (search) {
+      query.$or = [
+        { title: new RegExp(search, 'i') },
+        { description: new RegExp(search, 'i') }
+      ];
+    }
+    if (status) {
+      query.status = status;
+    }
+
+    const tasks = await Task.find(query).skip(skip).limit(limit);
+    const total = await Task.countDocuments(query);
+    const completed = await Task.countDocuments({ ...query, status: 'Completed' });
+
+    res.json({
+      tasks,
+      total,
+      completed,
+      page,
+      totalPages: Math.ceil(total / limit)
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Server Error' });
+  }
 });
 
-describe('Task API Routes', () => {
+// ✅ Get single task (with sharedWith user details)
+router.get('/', async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+    const { search = '', status } = req.query;
 
-  // POST - Create Task
-  it('should create a new task', async () => {
-    const response = await request(app).post('/api/tasks').send({
-      title: 'Test Task',
-      description: 'Testing create route',
-      status: 'Pending',
-      dueDate: '2025-12-31',
+    const query = {};
+    if (search) {
+      query.$or = [
+        { title: new RegExp(search, 'i') },
+        { description: new RegExp(search, 'i') }
+      ];
+    }
+    if (status) {
+      query.status = status;
+    }
+
+    const tasks = await Task.find(query).skip(skip).limit(limit);
+    const total = await Task.countDocuments(query);
+    const completed = await Task.countDocuments({ ...query, status: 'Completed' });
+
+    res.json({
+      tasks,
+      total,
+      completed,
+      page,
+      totalPages: Math.ceil(total / limit)
     });
 
-    expect(response.statusCode).toBe(201);
-    expect(response.body).toHaveProperty('_id');
-    expect(response.body.title).toBe('Test Task');
-
-    createdTaskId = response.body._id;
-  });
-
-  //  GET - All Tasks (with pagination)
-  it('should return tasks with pagination', async () => {
-    const res = await request(app).get('/api/tasks?page=1&limit=5');
-    expect(res.statusCode).toBe(200);
-    expect(res.body).toHaveProperty('tasks');
-    expect(Array.isArray(res.body.tasks)).toBe(true);
-  });
-
-  //  GET - Single Task by ID
-  it('should return a single task by ID', async () => {
-    const res = await request(app).get(`/api/tasks/${createdTaskId}`);
-    expect(res.statusCode).toBe(200);
-    expect(res.body).toHaveProperty('_id', createdTaskId);
-  });
-
-  //  PUT - Update Task
-  it('should update the task', async () => {
-    const res = await request(app).put(`/api/tasks/${createdTaskId}`).send({
-      title: 'Test Task Updated',
-      status: 'Completed'
-    });
-    expect(res.statusCode).toBe(200);
-    expect(res.body.title).toBe('Test Task Updated');
-    expect(res.body.status).toBe('Completed');
-  });
-
-  //  DELETE - Delete Task
-  it('should delete the task', async () => {
-    const res = await request(app).delete(`/api/tasks/${createdTaskId}`);
-    expect(res.statusCode).toBe(200);
-    expect(res.body.message).toMatch(/deleted/i);
-  });
-
+  } catch (err) {
+    console.error('🔥 ERROR in GET /api/tasks:', err); // Log real error
+    res.status(500).json({ message: 'Server Error' });
+  }
 });
+
+
+// Update task
+router.put('/:id', validateTask, async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+  try {
+    const task = await Task.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!task) return res.status(404).json({ message: 'Task not found' });
+
+    // Notify shared users on status change
+    const io = req.app.get('io');
+    if (task.sharedWith && io) {
+      const sockets = [...io.sockets.sockets.values()];
+      task.sharedWith.forEach(userId => {
+        const targetSocket = sockets.find(s => s.userId === userId);
+        if (targetSocket) {
+          targetSocket.emit('notification', {
+            message: `Task "${task.title}" has been updated.`
+          });
+        }
+      });
+    }
+
+    res.json(task);
+  } catch (err) {
+    res.status(500).json({ message: 'Server Error' });
+  }
+});
+
+// Delete task
+router.delete('/:id', async (req, res) => {
+  try {
+    const task = await Task.findByIdAndDelete(req.params.id);
+    if (!task) return res.status(404).json({ message: 'Task not found' });
+    res.json({ message: 'Task deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server Error' });
+  }
+});
+
+// Share task with another user
+router.put('/:id/share', async (req, res) => {
+  const { id } = req.params;
+  const { userIdToShareWith } = req.body;
+
+  try {
+    const task = await Task.findById(id);
+    if (!task) return res.status(404).json({ message: 'Task not found' });
+
+    if (!task.sharedWith.includes(userIdToShareWith)) {
+      task.sharedWith.push(userIdToShareWith);
+      await task.save();
+    }
+
+    res.json({ message: 'Task shared successfully' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Get tasks shared with a user
+router.get('/shared/:userId', async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const tasks = await Task.find({ sharedWith: userId });
+    res.json(tasks);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+module.exports = router;

@@ -4,6 +4,9 @@ import TaskForm from './components/TaskForm';
 import TaskDetails from './components/TaskDetails';
 import * as api from './services/api';
 import './index.css';
+import { io } from 'socket.io-client'; // Import socket.io-client
+
+const socket = io('http://localhost:5000'); // Change if deployed
 
 function App() {
   const [tasks, setTasks] = useState([]);
@@ -16,6 +19,7 @@ function App() {
   const [totalTasks, setTotalTasks] = useState(0);
   const [completedTasks, setCompletedTasks] = useState(0);
   const [successMessage, setSuccessMessage] = useState('');
+  const [notification, setNotification] = useState(null); // Real-time notification
   const formRef = useRef(null);
   const limit = 5;
 
@@ -24,10 +28,23 @@ function App() {
     setPage(1);
   }, [searchTerm, filterStatus]);
 
+  // Load tasks
   useEffect(() => {
     const shouldShowView = !!searchTerm || !!filterStatus;
     loadTasks(shouldShowView);
   }, [page, searchTerm, filterStatus]);
+
+  // Listen for notifications
+  useEffect(() => {
+    socket.on('notification', (data) => {
+      setNotification(data.message);
+      setTimeout(() => setNotification(null), 4000);
+    });
+
+    return () => {
+      socket.off('notification');
+    };
+  }, []);
 
   async function loadTasks(showSingleTask = false) {
     try {
@@ -37,7 +54,6 @@ function App() {
       setCompletedTasks(data.completed);
       setTotalPages(Math.max(Math.ceil(data.total / limit), 1));
 
-      //  Only show task details if filtering/searching & 1 result
       if (showSingleTask && data.tasks.length === 1) {
         setViewTask(data.tasks[0]);
       } else if (showSingleTask) {
@@ -60,7 +76,7 @@ function App() {
 
       setEditTask(null);
       setViewTask(null);
-      await loadTasks(false); 
+      await loadTasks(false);
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (error) {
       console.error("Error saving task:", error.message);
@@ -91,14 +107,21 @@ function App() {
           Task Manager
         </h1>
 
-        {/*  Success Message */}
+        {/* Success Message */}
         {successMessage && (
           <div className="mb-4 px-4 py-2 bg-green-100 text-green-800 font-medium rounded text-center">
             {successMessage}
           </div>
         )}
 
-        {/*  Task Form */}
+        {/* Real-Time Notification */}
+        {notification && (
+          <div className="mb-4 px-4 py-2 bg-yellow-100 text-yellow-800 font-medium rounded text-center">
+            🔔 {notification}
+          </div>
+        )}
+
+        {/* Task Form */}
         <div ref={formRef}>
           <TaskForm
             onSave={handleSave}
@@ -107,12 +130,7 @@ function App() {
           />
         </div>
 
-        {/*  Instruction */}
-        <h3 className="text-md font-medium text-gray-700 mb-2 text-center">
-          Select a task to see details
-        </h3>
-
-        {/*  Search & Filter */}
+        {/* Search and Filter */}
         <div className="flex flex-col md:flex-row gap-4 mb-4 px-4">
           <input
             type="text"
@@ -133,21 +151,17 @@ function App() {
           </select>
         </div>
 
-        {/*  Progress Bar */}
+        {/* Progress Bar */}
         {totalTasks > 0 && (
           <div className="mb-6 px-4">
             <h3 className="text-lg font-medium text-gray-700 mb-2">Task Completion Progress</h3>
             <div className="w-full bg-gray-300 rounded-full h-4 overflow-hidden">
-              <div
-                className="bg-green-500 h-full"
-                style={{ width: `${completionRate}%` }}
-              ></div>
+              <div className="bg-green-500 h-full" style={{ width: `${completionRate}%` }}></div>
             </div>
             <p className="text-sm text-gray-600 mt-1">{completionRate}% completed</p>
           </div>
         )}
 
-        {/* Task List */}
         <TaskList
           tasks={tasks}
           onView={(task) => setViewTask(task)}
@@ -159,10 +173,8 @@ function App() {
           onDelete={handleDelete}
         />
 
-        {/* Task Details */}
         {viewTask && <TaskDetails task={viewTask} />}
 
-        {/*  Pagination */}
         <div className="flex justify-between items-center mt-6 px-4">
           <button
             onClick={() => setPage(prev => Math.max(prev - 1, 1))}

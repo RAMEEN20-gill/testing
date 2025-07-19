@@ -18,4 +18,4 @@ app.get('/', (req, res) => {
 
 app.use(errorHandler);
 
-module.exports = app; // ✅ export only the app (no server or DB here)
+module.exports = app; // export only the app (no server or DB here)

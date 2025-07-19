@@ -1,16 +1,9 @@
 const baseUrl = "http://localhost:5000/api/tasks";
 
 // Get all tasks with optional pagination
-
-
 export async function getTasks(page = 1, limit = 10, search = '', status = '') {
   try {
-    const params = new URLSearchParams({
-      page,
-      limit,
-      search,
-      status
-    });
+    const params = new URLSearchParams({ page, limit, search, status });
 
     const res = await fetch(`${baseUrl}?${params.toString()}`);
     const data = await res.json();
@@ -27,8 +20,6 @@ export async function getTasks(page = 1, limit = 10, search = '', status = '') {
     return { tasks: [], total: 0, completed: 0, page: 1, totalPages: 1 };
   }
 }
-
-
 
 // Create a new task
 export async function createTask(task) {
@@ -68,6 +59,29 @@ export async function deleteTask(id) {
     await fetch(`${baseUrl}/${id}`, { method: "DELETE" });
   } catch (error) {
     console.error("Failed to delete task:", error);
+    throw error;
+  }
+}
+
+// Share a task with another user
+export async function shareTask(taskId, userIdToShareWith) {
+  try {
+    const res = await fetch(`${baseUrl}/${taskId}/share`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ userId: userIdToShareWith }) // This must match backend field name
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to share task');
+    }
+
+    return await res.json();
+  } catch (error) {
+    console.error("Error in shareTask:", error);
     throw error;
   }
 }
