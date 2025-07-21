@@ -1,47 +1,42 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const Task = require('../models/task');
-const taskController = require('../controllers/taskController');
-
+const Notification = require('../models/notifications');
+const User = require('../models/user'); // Needed to look up by username & email
+const authMiddleware = require('./auth');
 
 const router = express.Router();
-router.get('/', taskController.getAllTasks);
 
 // Validation rules
 const validateTask = [
   body('title').notEmpty().withMessage('Title is required'),
-  body('status').optional().isIn(['Pending', 'In Progress', 'Completed']),
+  body('status').optional().isIn(['Pending', 'In Progress', 'Completed'])
 ];
 
-// 1️⃣ Create a new task
-router.post('/', validateTask, async (req, res) => {
+// Create a new task (with owner)
+router.post('/', authMiddleware, validateTask, async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
   try {
-    const task = new Task(req.body);
+    const task = new Task({ ...req.body, owner: req.user.id });
     await task.save();
-    const populatedTask = await Task.findById(task._id)
-      .populate('owner', 'name email')
-      .populate('sharedWith', 'name email');
-
-    res.status(201).json(populatedTask);
+    res.status(201).json(task);
   } catch (err) {
-    console.error('Create Task Error:', err);
     res.status(500).json({ message: 'Server Error' });
   }
 });
 
-// 2️⃣ Get all tasks (with pagination & filtering)
-router.get('/', async (req, res) => {
-   console.log('🔍 GET /api/tasks hit');
+// Get all tasks owned by user (with pagination + filtering)
+router.get('/', authMiddleware, async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
+
     const { search = '', status } = req.query;
 
-    const query = {};
+    const query = { owner: req.user.id };
     if (search) {
       query.$or = [
         { title: new RegExp(search, 'i') },
@@ -52,12 +47,7 @@ router.get('/', async (req, res) => {
       query.status = status;
     }
 
-    const tasks = await Task.find(query)
-      .skip(skip)
-      .limit(limit)
-      .populate('owner', 'name email')
-      .populate('sharedWith', 'name email');
-
+    const tasks = await Task.find(query).skip(skip).limit(limit);
     const total = await Task.countDocuments(query);
     const completed = await Task.countDocuments({ ...query, status: 'Completed' });
 
@@ -69,91 +59,104 @@ router.get('/', async (req, res) => {
       totalPages: Math.ceil(total / limit)
     });
   } catch (err) {
-    console.error('Fetch Tasks Error:', err);
-    res.status(500).json({ message: 'Server Error', error: err.message });
+    res.status(500).json({ message: 'Server Error' });
   }
 });
 
-// 3️⃣ Update task
-router.put('/:id', validateTask, async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-
+// Get tasks shared with the user
+router.get("/shared", authMiddleware, async (req, res) => {
   try {
-    const task = await Task.findByIdAndUpdate(req.params.id, req.body, { new: true })
-      .populate('owner', 'name email')
-      .populate('sharedWith', 'name email');
+    const tasks = await Task.find({ sharedWith: req.user.id });
+    res.json(tasks);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
+// Share task with user using username and email
+router.put("/:id/share", authMiddleware, async (req, res) => {
+  try {
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ message: "Task not found" });
+
+    if (String(task.owner) !== req.user.id)
+      return res.status(403).json({ message: "Unauthorized" });
+
+    const { username, email } = req.body;
+    if (!username || !email) {
+      return res.status(400).json({ message: "Username and email are required" });
+    }
+
+    // Find the user by both username and email
+    const userToShare = await User.findOne({ username, email });
+    if (!userToShare) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Add user to sharedWith array if not already added
+    if (!task.sharedWith.includes(userToShare._id)) {
+      task.sharedWith.push(userToShare._id);
+      await task.save();
+
+      // Create and emit notification
+      const note = new Notification({
+        user: userToShare._id,
+        message: `A task was shared with you: "${task.title}"`,
+      });
+      await note.save();
+      req.io?.to(userToShare._id.toString()).emit("notification", note);
+    }
+
+    res.json({ message: "✅ Task shared successfully!" });
+  } catch (err) {
+    console.error("Share Error:", err);
+    res.status(500).json({ error: "Server Error" });
+  }
+});
+
+// Update task (status, title, etc.)
+router.put('/:id', authMiddleware, validateTask, async (req, res) => {
+  try {
+    const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ message: 'Task not found' });
 
-    // Notify shared users on update
-    const io = req.app.get('io');
-    if (task.sharedWith && io) {
-      const sockets = [...io.sockets.sockets.values()];
-      task.sharedWith.forEach(user => {
-        const targetSocket = sockets.find(s => s.userId === user._id.toString());
-        if (targetSocket) {
-          targetSocket.emit('notification', {
-            message: `Task "${task.title}" has been updated.`,
-          });
-        }
-      });
+    if (String(task.owner) !== req.user.id)
+      return res.status(403).json({ message: 'Unauthorized' });
+
+    Object.assign(task, req.body);
+    await task.save();
+
+    // Notify shared users if status changed
+    if (req.body.status) {
+      for (let id of task.sharedWith) {
+        const note = new Notification({
+          user: id,
+          message: `Task "${task.title}" status updated to ${task.status}`,
+        });
+        await note.save();
+        req.io?.to(id).emit('notification', note);
+      }
     }
 
     res.json(task);
   } catch (err) {
-    console.error('Update Task Error:', err);
     res.status(500).json({ message: 'Server Error' });
   }
 });
 
-// 4️⃣ Delete task
-router.delete('/:id', async (req, res) => {
+// Delete task
+router.delete('/:id', authMiddleware, async (req, res) => {
   try {
-    const task = await Task.findByIdAndDelete(req.params.id);
+    const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ message: 'Task not found' });
+
+    if (String(task.owner) !== req.user.id)
+      return res.status(403).json({ message: 'Unauthorized' });
+
+    await task.remove();
     res.json({ message: 'Task deleted successfully' });
   } catch (err) {
-    console.error('Delete Task Error:', err);
     res.status(500).json({ message: 'Server Error' });
-  }
-});
-
-// 5️⃣ Share task
-router.put('/:id/share', async (req, res) => {
-  const { id } = req.params;
-  const { userIdToShareWith } = req.body;
-
-  try {
-    const task = await Task.findById(id);
-    if (!task) return res.status(404).json({ message: 'Task not found' });
-
-    if (!task.sharedWith.includes(userIdToShareWith)) {
-      task.sharedWith.push(userIdToShareWith);
-      await task.save();
-    }
-
-    const updatedTask = await Task.findById(task._id).populate('sharedWith', 'name email');
-    res.json({ message: 'Task shared successfully', task: updatedTask });
-  } catch (err) {
-    console.error('Share Task Error:', err);
-    res.status(500).json({ message: err.message });
-  }
-});
-
-// 6️⃣ Get shared tasks for a user
-router.get('/shared/:userId', async (req, res) => {
-  const { userId } = req.params;
-
-  try {
-    const tasks = await Task.find({ sharedWith: userId })
-      .populate('owner', 'name email')
-      .populate('sharedWith', 'name email');
-
-    res.json(tasks);
-  } catch (err) {
-    console.error('Get Shared Tasks Error:', err);
-    res.status(500).json({ message: err.message });
   }
 });
 

@@ -1,61 +1,65 @@
-const mongoose = require('mongoose');
-const dotenv = require('dotenv');
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
-const app = require('./app');
+const mongoose = require('mongoose');
 
-dotenv.config();
+const taskRoutes = require('./routes/tasks');
+const authRoutes = require('./routes/auth');
+const errorHandler = require('./middleware/errorHandler');
 
-// Create HTTP server
+const app = express(); // ✅ Define app before using it
+app.use(express.json());
+app.use(cors());
+
 const server = http.createServer(app);
-
-// Initialize Socket.IO with CORS config
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:3000", // Change "*" to your frontend URL in production
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    credentials: true
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE']
   }
 });
 
-// Store connected users: { userId: socketId }
-const connectedUsers = {};
-
-// Setup WebSocket connection
+// Socket.IO connection
 io.on('connection', (socket) => {
-  console.log('New user connected:', socket.id);
+  console.log('New socket connected:', socket.id);
 
-  // Register user with their userId
   socket.on('register', (userId) => {
-    connectedUsers[userId] = socket.id;
-    console.log(`User ${userId} registered with socket ${socket.id}`);
+    socket.join(userId);
+    console.log(`Socket ${socket.id} registered to user ${userId}`);
   });
 
-  // Handle disconnect
   socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
-    for (const [userId, socketId] of Object.entries(connectedUsers)) {
-      if (socketId === socket.id) {
-        delete connectedUsers[userId];
-        break;
-      }
-    }
+    console.log(`Socket disconnected: ${socket.id}`);
+  });
+
+  socket.on('error', (err) => {
+    console.error('Socket error:', err.message);
   });
 });
 
-// Attach io to app for global access in routes/controllers
-app.set('io', io);
-app.set('connectedUsers', connectedUsers); // Also expose connected users if needed
+// Attach io to every request
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
 
-// Connect to MongoDB and start server
+app.set('io', io);
+
+// Routes (✅ after app is defined)
+app.use('/api/auth', authRoutes);
+app.use('/api/tasks', taskRoutes);
+app.get('/', (req, res) => res.send('API running'));
+
+// Error handler
+app.use(errorHandler);
+
+// MongoDB and Server
+const PORT = process.env.PORT || 5000;
 mongoose.connect(process.env.MONGO_URI)
   .then(() => {
-    console.log('✅ MongoDB Connected');
-    const PORT = process.env.PORT || 5000;
-    server.listen(PORT, () => {
-      console.log(`🚀 Server is running on port ${PORT}`);
-    });
+    console.log('MongoDB connected');
+    server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
   })
-  .catch(err => {
-    console.error('❌ MongoDB connection failed:', err.message);
-  });
+  .catch(err => console.error('DB connection error:', err.message));

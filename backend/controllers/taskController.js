@@ -1,77 +1,28 @@
-const Task = require('../models/task');
+const mongoose = require('mongoose');
 
-exports.getAllTasks = async (req, res, next) => {
-  try {
-    console.log('📥 Incoming GET /api/tasks with query:', req.query);
-
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const search = req.query.search || '';
-    const status = req.query.status;
-
-    const query = {
-      $or: [
-        { title: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } }
-      ]
-    };
-
-    if (status === 'completed') {
-      query.completed = true;
-    } else if (status === 'pending') {
-      query.completed = false;
-    }
-
-    const total = await Task.countDocuments(query);
-    const completed = await Task.countDocuments({ ...query, completed: true });
-
-    const tasks = await Task.find(query)
-      .skip((page - 1) * limit)
-      .limit(limit)
-      .sort({ createdAt: -1 });
-
-    res.status(200).json({
-      tasks,
-      total,
-      completed,
-      page,
-      totalPages: Math.ceil(total / limit)
-    });
-
-  } catch (error) {
-    console.error('🔥 getAllTasks error:', error.message);
-    res.status(500).json({ message: "Server Error" });
-  }
-};
 exports.shareTask = async (req, res) => {
   try {
-    const taskId = req.params.id;
-    const { userIdToShareWith } = req.body;
+    const { id } = req.params;
+    const { userIdToShare } = req.body;
 
-    // Check if the user exists
-    const userToShareWith = await User.findById(userIdToShareWith);
-    if (!userToShareWith) {
-      return res.status(404).json({ message: "User to share with not found." });
+    if (!mongoose.Types.ObjectId.isValid(userIdToShare)) {
+      return res.status(400).json({ message: 'Invalid user ID to share with.' });
     }
 
-    // Update the task
-    const task = await Task.findById(taskId);
-    if (!task) {
-      return res.status(404).json({ message: "Task not found." });
+    const task = await Task.findById(id);
+    if (!task) return res.status(404).json({ message: 'Task not found' });
+
+    if (task.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Only the owner can share this task.' });
     }
 
-    // Prevent duplicate sharing
-    if (task.sharedWith.includes(userIdToShareWith)) {
-      return res.status(400).json({ message: "Task already shared with this user." });
+    if (!task.sharedWith.includes(userIdToShare)) {
+      task.sharedWith.push(userIdToShare);
+      await task.save();
     }
 
-    task.sharedWith.push(userIdToShareWith);
-    await task.save();
-
-    res.status(200).json({ message: "Task shared successfully." });
-
+    res.json({ message: 'Task shared successfully.' });
   } catch (err) {
-    console.error('❌ Error in shareTask:', err.message);
-    res.status(500).json({ message: "Failed to share task." });
+    res.status(500).json({ message: err.message });
   }
 };
