@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
-const User = require('../models/User');
+const User = require('./models/User');
 
 // 1. Connect to local MongoDB
 mongoose.connect('mongodb://localhost:27017/taskdb', {

@@ -1,65 +1,59 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const http = require('http');
-const { Server } = require('socket.io');
-const mongoose = require('mongoose');
+const express = require("express");
+const dotenv = require("dotenv");
+const mongoose = require("mongoose");
+const cors = require("cors");
+const http = require("http");
+const { Server } = require("socket.io");
+const { setupSocket } = require("./socket/socket");
+const analyticsRoutes = require('./routes/analyticsRoutes');
 
-const taskRoutes = require('./routes/tasks');
-const authRoutes = require('./routes/auth');
-const errorHandler = require('./middleware/errorHandler');
+console.log("✅ analyticsRoutes loaded", typeof analyticsRoutes);
+const authRoutes = require("./routes/authRoutes");
+console.log("✅ authRoutes loaded", typeof authRoutes);
+const taskRoutes = require("./routes/taskRoutes");
+console.log("✅ taskRoutes loaded", typeof taskRoutes);
+const notificationRoutes = require("./routes/notificationRoutes");
+console.log("✅ notificationRoutes loaded", typeof notificationRoutes);
 
-const app = express(); // ✅ Define app before using it
-app.use(express.json());
-app.use(cors());
 
+const { notFound, errorHandler } = require("./middleware/errorMiddleware");
+const connectDB = require("./config/db");
+
+dotenv.config();
+connectDB();
+
+const app = express();
 const server = http.createServer(app);
+
+// Setup socket.io
 const io = new Server(server, {
   cors: {
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE']
-  }
+    origin: "*",
+  },
 });
+setupSocket(io);
 
-// Socket.IO connection
-io.on('connection', (socket) => {
-  console.log('New socket connected:', socket.id);
+app.use(cors());
+app.use(express.json());
+app.use("/uploads", express.static("uploads"));
 
-  socket.on('register', (userId) => {
-    socket.join(userId);
-    console.log(`Socket ${socket.id} registered to user ${userId}`);
-  });
+// API Routes
+app.use("/api/users", authRoutes);
+app.use("/api/tasks", taskRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
-  socket.on('disconnect', () => {
-    console.log(`Socket disconnected: ${socket.id}`);
-  });
 
-  socket.on('error', (err) => {
-    console.error('Socket error:', err.message);
-  });
-});
 
-// Attach io to every request
-app.use((req, res, next) => {
-  req.io = io;
-  next();
-});
 
-app.set('io', io);
 
-// Routes (✅ after app is defined)
-app.use('/api/auth', authRoutes);
-app.use('/api/tasks', taskRoutes);
-app.get('/', (req, res) => res.send('API running'));
 
-// Error handler
+
+// Error Handling Middleware
+app.use(notFound);
 app.use(errorHandler);
 
-// MongoDB and Server
 const PORT = process.env.PORT || 5000;
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => {
-    console.log('MongoDB connected');
-    server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-  })
-  .catch(err => console.error('DB connection error:', err.message));
+server.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});

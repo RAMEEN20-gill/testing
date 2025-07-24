@@ -4,9 +4,11 @@ const taskSchema = new mongoose.Schema(
   {
     title: {
       type: String,
-      required: true,
+      required: [true, "Task title is required"],
     },
-    description: String,
+    description: {
+      type: String,
+    },
     status: {
       type: String,
       enum: ["Pending", "In Progress", "Completed"],
@@ -24,13 +26,9 @@ const taskSchema = new mongoose.Schema(
         ref: "User",
       },
     ],
-    attachments: [
-      {
-        filename: String,
-        path: String,
-        mimetype: String,
-      },
-    ],
+    attachment: {
+      type: String, // File URL or path
+    },
   },
   {
     timestamps: true,
