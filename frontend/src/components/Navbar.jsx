@@ -1,34 +1,38 @@
-import React from "react";
-import { Link } from "react-router-dom";
-import { Bell, Moon, Sun } from "lucide-react";
-import { useTheme } from "../context/ThemeContext";
-import NotificationDropdown from "./NotificationDropdown";
+import React from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import logo from '../assets/logo.png';
 
-const Navbar = ({ onLogout, notifications, onClearNotifications }) => {
-  const { darkMode, toggleDarkMode } = useTheme();
+const Navbar = () => {
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    navigate('/login');
+  };
+
+  const isAuthenticated = !!localStorage.getItem('token');
 
   return (
-    <nav className="bg-white dark:bg-gray-900 shadow p-4 flex justify-between items-center mb-6">
-      <Link to="/" className="text-2xl font-bold text-gray-900 dark:text-white">
-        Task Manager
-      </Link>
-      <div className="flex items-center space-x-4">
-        <NotificationDropdown
-          notifications={notifications}
-          onClearNotifications={onClearNotifications}
-        />
-        <button
-          onClick={toggleDarkMode}
-          className="text-gray-700 dark:text-gray-300 hover:text-blue-500 dark:hover:text-blue-400"
-        >
-          {darkMode ? <Sun size={20} /> : <Moon size={20} />}
-        </button>
-        <button
-          onClick={onLogout}
-          className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
-        >
-          Logout
-        </button>
+    <nav className="bg-gray-900 text-white p-4 flex items-center justify-between">
+      <div className="flex items-center">
+        <img src={logo} alt="Logo" className="w-20 h-auto mr-3" />
+        <Link to="/" className="text-xl font-bold">Task Manager</Link>
+      </div>
+
+      <div className="flex space-x-4">
+        {isAuthenticated ? (
+          <>
+            <Link to="/dashboard" className="hover:text-gray-300">Dashboard</Link>
+            <Link to="/analytics" className="hover:text-gray-300">Analytics</Link>
+            <Link to="/shared" className="hover:text-gray-300">Shared Tasks</Link>
+            <button onClick={handleLogout} className="hover:text-gray-300">Logout</button>
+          </>
+        ) : (
+          <>
+            <Link to="/login" className="hover:text-gray-300">Login</Link>
+            <Link to="/register" className="hover:text-gray-300">Register</Link>
+          </>
+        )}
       </div>
     </nav>
   );

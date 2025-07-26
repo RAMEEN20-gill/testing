@@ -8,5 +8,4 @@ const { protect } = require("../middleware/authMiddleware");
 
 router.get("/overview", protect, getAnalyticsOverview);
 router.get("/trends", protect, getAnalyticsTrends);
-
 module.exports = router;

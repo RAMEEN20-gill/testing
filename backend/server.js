@@ -5,16 +5,11 @@ const cors = require("cors");
 const http = require("http");
 const { Server } = require("socket.io");
 const { setupSocket } = require("./socket/socket");
-const analyticsRoutes = require('./routes/analyticsRoutes');
 
-console.log("✅ analyticsRoutes loaded", typeof analyticsRoutes);
 const authRoutes = require("./routes/authRoutes");
-console.log("✅ authRoutes loaded", typeof authRoutes);
 const taskRoutes = require("./routes/taskRoutes");
-console.log("✅ taskRoutes loaded", typeof taskRoutes);
 const notificationRoutes = require("./routes/notificationRoutes");
-console.log("✅ notificationRoutes loaded", typeof notificationRoutes);
-
+const analyticsRoutes = require("./routes/analyticsRoutes");
 
 const { notFound, errorHandler } = require("./middleware/errorMiddleware");
 const connectDB = require("./config/db");
@@ -33,21 +28,16 @@ const io = new Server(server, {
 });
 setupSocket(io);
 
+// Middleware
 app.use(cors());
 app.use(express.json());
 app.use("/uploads", express.static("uploads"));
 
-// API Routes
+// ✅ Use routes directly (they must export `express.Router()` objects)
 app.use("/api/users", authRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/notifications", notificationRoutes);
-app.use('/api/analytics', analyticsRoutes);
-
-
-
-
-
-
+app.use("/api/analytics", analyticsRoutes);
 
 // Error Handling Middleware
 app.use(notFound);
