@@ -90,24 +90,20 @@ TAILWIND-REACT-TEMPLATE/
 ```bash
 git clone https://github.com/RAMEEN20-gill/testing.git
 cd testing
+
 2. Backend Setup
 bash
 cd backend
 npm install
 ➕ Create a .env file:
 env
-                                                                                                                                                                                                                                                                     PORT=5000
+ PORT=5000
 MONGO_URI=mongodb://localhost:27017/taskmanager
 JWT_SECRET=myTOPsecret234
 Start Backend
-bash
-Copy
-Edit
 node server.js
+
 3. Frontend Setup
-bash
-Copy
-Edit
 cd ../frontend
 npm install
 npm run dev
@@ -140,18 +136,9 @@ GET	/api/analytics/trends	Get chart data
 
 🌙 Dark Mode
 
-👤 Author
+ Author
 Rameen Gill
-GitHub
 
-📃 License
-MIT License — Free to use and modify.
-
-yaml
-Copy
-Edit
-
----
 
 ### ✅ What's Included:
 
@@ -161,13 +148,6 @@ Edit
 - Screenshot placeholders (add actual screenshots in `frontend/public/screens/`)
 - Clean, professional structure
 
-Let me know if you'd like a **video script** or help creating screenshots.
 
 
-
-
-
-
-
-Ask ChatGPT
 
