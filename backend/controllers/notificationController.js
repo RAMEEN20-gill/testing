@@ -1,11 +1,14 @@
-const Notification = require("../models/Notification");
+const Notification = require("../models/notificationModel");
 
-// Get all notifications for the logged-in user
-exports.getNotifications = async (req, res) => {
+// GET /notifications - Get notifications for the logged-in user
+const getNotifications = async (req, res) => {
   try {
-    const notifications = await Notification.find({ recipient: req.user._id }).sort({ createdAt: -1 });
-    res.json(notifications);
+    const notifications = await Notification.find({ user: req.user.id }).sort({ createdAt: -1 });
+    res.status(200).json(notifications);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Error fetching notifications:", error);
+    res.status(500).json({ message: "Failed to fetch notifications" });
   }
 };
+
+module.exports = { getNotifications };

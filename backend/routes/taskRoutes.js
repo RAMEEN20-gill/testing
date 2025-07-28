@@ -6,14 +6,15 @@ const {
   updateTask,
   deleteTask,
   shareTask,
-  getSharedTasks,
+  getSharedTasks
 } = require("../controllers/taskController");
+const { protect } = require("../middleware/authMiddleware");
 
-router.post("/", createTask);
-router.get("/", getTasks);
-router.put("/:id", updateTask);
-router.delete("/:id", deleteTask);
-router.put("/:id/share", shareTask);
-router.get("/shared", getSharedTasks);
+router.post("/", protect, createTask);
+router.get("/", protect, getTasks);
+router.put("/:id", protect, updateTask);
+router.delete("/:id", protect, deleteTask);
+router.put("/:id/share", protect, shareTask);
+router.get("/shared", protect, getSharedTasks);
 
 module.exports = router;

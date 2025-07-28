@@ -8,8 +8,11 @@ const { setupSocket } = require("./socket/socket");
 
 const authRoutes = require("./routes/authRoutes");
 const taskRoutes = require("./routes/taskRoutes");
+
 const notificationRoutes = require("./routes/notificationRoutes");
+
 const analyticsRoutes = require("./routes/analyticsRoutes");
+
 
 const { notFound, errorHandler } = require("./middleware/errorMiddleware");
 const connectDB = require("./config/db");
@@ -38,6 +41,7 @@ app.use("/api/users", authRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/analytics", analyticsRoutes);
+
 
 // Error Handling Middleware
 app.use(notFound);
