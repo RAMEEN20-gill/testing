@@ -4,8 +4,7 @@ A full-featured Task Management System built with **MERN Stack (MongoDB, Express
 
 ##  Live Demo
 
- Deployed Frontend: [Vercel Link Here]  
- Deployed Backend: [Render Link Here]  
+
 📝 Demo Credentials:  
 - **Email:** test@example.com  
 - **Password:** 123456
